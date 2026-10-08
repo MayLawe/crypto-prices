@@ -1,8 +1,11 @@
 import logging
 import requests
-import pandas as pd
 from datetime import datetime, timezone
 import os
+from dotenv import load_dotenv
+import psycopg2
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,6 +16,16 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
+
+def get_connection():
+    conn = psycopg2.connect(
+        host = os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        dbname = os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+    )
+    return conn
 
 
 def fetch_prices():
@@ -43,19 +56,27 @@ def build_rows(data):
     return rows
 
 
-def save_to_csv(rows):
-    df = pd.DataFrame(rows)
-    df["timestamp"] = datetime.now(timezone.utc).isoformat()
-    file_exists = os.path.exists("prices.csv")
-    df.to_csv("prices.csv", mode="a", header=not file_exists, index=False)
-    logger.info("Data saved to CSV.")
+def save_to_db(rows):
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_connection()
 
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                for row in rows:
+                    cur.execute("INSERT INTO prices(coin, price_usd, fetched_at) VALUES (%s,%s,%s)",
+                                (row["coin"], row["price_usd"], now)
+                            )
+        logger.info(f"Записано {len(rows)} строк")
+
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     data = fetch_prices()
     rows = build_rows(data)
     if rows != []:
-        save_to_csv(rows)
+        save_to_db(rows)
     else:
         logger.warning("No data to save.")
     logger.info("Process completed successfully.")

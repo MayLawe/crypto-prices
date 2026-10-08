@@ -2,5 +2,6 @@ venv/
 .env
 .vscode/
 app.log
+cron.log
 *.csv
 __pycache__/
