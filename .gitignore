@@ -5,3 +5,4 @@ app.log
 cron.log
 *.csv
 __pycache__/
+.dockerignore
